@@ -88,26 +88,30 @@ class GittyLeak():
        else:
            self.revision_list = git('rev-list', '--all').strip().split('\n')
 
-    def get_git_matches(self, revision):
+    def get_git_matches(self, revision) -> 'List[str]':
         try:
-            return str(git('grep', '-i', '-e', '"({})"'.format(r'\|'.join(self.keywords)),
-                           revision, _tty_out=False))
+            g = git('grep', '-i', '-e', '"({})"'.format(r'\|'.join(self.keywords)),
+                           revision, _tty_out=False, _decode_errors="ignore")
+            return str(g).split("\n")
         # return subprocess.check_output('git grep -i -e
         # "(api\\|key\\|username\\|user\\|pw\\|password\\|pass\\|email\\|mail)" --
         # `git ls-files | grep -v .html` | cat', shell=True).decode('utf8')
         except sh.ErrorReturnCode_1:
-            return ''
+            return []
         except:
+            raise
             print('encoding error at revision: ', revision)
-            return ''
+            return []
 
     def get_word_matches(self):
         # git grep simple word matches (python processing follows)
-        word_matches = set()
         for revision in self.revision_list:
-            for m in self.get_git_matches(revision).split('\n'):
-                word_matches.add(m)
-        return word_matches
+            word_matches = set()
+            for m in self.get_git_matches(revision):
+                h = hash(m)
+                word_matches.add(h)
+                if h not in word_matches:
+                    yield m
 
     def validated_value(self, v):
         if v.strip():
